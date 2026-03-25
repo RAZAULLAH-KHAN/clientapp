@@ -1,0 +1,24 @@
+{
+    "name": "Harvest - Transaction Tracker",
+    "short_name": "Harvest",
+    "description": "Track your daily sales and calculate end-of-day totals.",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#f6f7f6",
+    "theme_color": "#0a473b",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}

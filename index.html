@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>transaction Track</title>
+    <meta name="description" content="Harvest - Track your daily sales and transactions easily.">
+    <meta name="theme-color" content="#0a473b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Harvest">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <div class="logo-inner"></div>
+                </div>
+                <h1 class="logo-text">Harvest</h1>
+            </div>
+            <button class="notification-btn" aria-label="Notifications" onclick="clearAllData()">
+                <i class="ph-fill ph-trash"></i>
+            </button>
+        </header>
+
+        <!-- ===== TAB: ACTIVITY ===== -->
+        <main class="tab-content active" id="tab-activity">
+            <section class="greeting">
+                <h2 class="greeting-title">Good morning, Store 402</h2>
+                <p class="greeting-sub">Ready for the first harvest of the day?</p>
+            </section>
+
+            <section class="action-card">
+                <button class="new-sale-btn" onclick="switchTab('add-transaction')">
+                    <div class="plus-circle">
+                        <i class="ph-bold ph-plus"></i>
+                    </div>
+                    <h3 class="action-title">New Sale</h3>
+                    <p class="action-subtitle">START TRANSACTION</p>
+                </button>
+                <div class="auto-capture-note">
+                    <i class="ph-fill ph-sparkles"></i>
+                    <span>Date, time, and location are captured automatically.</span>
+                </div>
+            </section>
+
+            <section class="stats-cards">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="ph-bold ph-trend-up"></i>
+                    </div>
+                    <p class="stat-label">TODAY'S VOLUME</p>
+                    <p class="stat-value" id="today-volume">$0</p>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="ph-bold ph-receipt"></i>
+                    </div>
+                    <p class="stat-label">TRANSACTIONS</p>
+                    <p class="stat-value" id="today-count">0</p>
+                </div>
+            </section>
+
+            <!-- Recent Transactions List -->
+            <section class="recent-section">
+                <h4 class="section-title">Recent Transactions</h4>
+                <div class="transactions-list" id="recent-transactions">
+                    <div class="empty-state">
+                        <i class="ph ph-receipt"></i>
+                        <p>No transactions yet today.<br>Tap "New Sale" to get started!</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- ===== TAB: SUMMARY ===== -->
+        <main class="tab-content" id="tab-summary">
+            <section class="greeting">
+                <h2 class="greeting-title">Daily Summary</h2>
+                <p class="greeting-sub">End-of-day breakdown</p>
+            </section>
+
+            <section class="summary-total-card">
+                <div class="summary-total-label">TOTAL EARNINGS TODAY</div>
+                <div class="summary-total-value" id="summary-total">$0</div>
+                <div class="summary-total-count" id="summary-count">0 transactions</div>
+            </section>
+
+            <section class="summary-breakdown">
+                <h4 class="section-title">All Transactions</h4>
+                <div class="transactions-list" id="summary-transactions">
+                    <div class="empty-state">
+                        <i class="ph ph-chart-bar"></i>
+                        <p>No data for today yet.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- ===== TAB: ADD TRANSACTION ===== -->
+        <main class="tab-content" id="tab-add-transaction">
+            <section class="greeting">
+                <h2 class="greeting-title">Add Transaction</h2>
+                <p class="greeting-sub">Enter the sale details below</p>
+            </section>
+
+            <form class="add-form" id="transaction-form" onsubmit="addTransaction(event)">
+                <div class="form-group">
+                    <label for="txn-description">Description</label>
+                    <input type="text" id="txn-description" placeholder="e.g. Coffee, Burger, Groceries..." required
+                        autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="txn-amount">Amount (PKR)</label>
+                    <input type="number" id="txn-amount" placeholder="0.00" min="0.01" step="0.01" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="txn-category">Category</label>
+                    <select id="txn-category">
+                        <option value="Sale">Sale</option>
+                        <option value="Food">Food</option>
+                        <option value="Transport">Transport</option>
+                        <option value="Shopping">Shopping</option>
+                        <option value="Bills">Bills</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="submit-btn">
+                    <i class="ph-bold ph-check-circle"></i>
+                    <span>Add Transaction</span>
+                </button>
+            </form>
+        </main>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-tab="activity" onclick="switchTab('activity')">
+                <i class="ph-bold ph-receipt"></i>
+                <span>ACTIVITY</span>
+            </button>
+            <button class="nav-item" data-tab="summary" onclick="switchTab('summary')">
+                <i class="ph-bold ph-chart-bar"></i>
+                <span>SUMMARY</span>
+            </button>
+            <button class="nav-item" data-tab="add-transaction" onclick="switchTab('add-transaction')">
+                <i class="ph-bold ph-plus-circle"></i>
+                <span>ADD</span>
+            </button>
+        </nav>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
