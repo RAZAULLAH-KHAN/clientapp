@@ -4,8 +4,8 @@
     "description": "Track your daily sales and calculate end-of-day totals.",
     "start_url": "./index.html",
     "display": "standalone",
-    "background_color": "#f6f7f6",
-    "theme_color": "#0a473b",
+    "background_color": "#f5f6fa",
+    "theme_color": "#7a101b",
     "orientation": "portrait",
     "icons": [
         {
