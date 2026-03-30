@@ -1,17 +1,90 @@
 // =============================================
-// Harvest App - Backend Logic (localStorage)
+// Harvest App - Backend Logic (IndexedDB)
 // =============================================
 
-// ---- Data Layer ----
-const STORAGE_KEY = 'harvest_transactions';
+const DB_NAME = 'harvest_db';
+const DB_VERSION = 1;
+const STORE_NAME = 'transactions';
 
-function getTransactions() {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+let dbPromise;
+
+function initDB() {
+    if (!dbPromise) {
+        dbPromise = new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onerror = e => reject(e.target.error);
+            request.onsuccess = e => resolve(e.target.result);
+            request.onupgradeneeded = e => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                }
+            };
+        });
+    }
+    return dbPromise;
 }
 
-function saveTransactions(transactions) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+async function getTransactions() {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result.sort((a, b) => b.id - a.id));
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function saveTransaction(txn) {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.put(txn);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+async function deleteTransactionFromDB(id) {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+async function clearAllTransactionsDB() {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+async function migrateLocalStorage() {
+    const oldData = localStorage.getItem('harvest_transactions');
+    if (oldData) {
+        try {
+            const transactions = JSON.parse(oldData);
+            if (transactions.length > 0) {
+                for (const txn of transactions) {
+                    await saveTransaction(txn);
+                }
+                console.log(`Migrated ${transactions.length} items from localStorage to IndexedDB.`);
+            }
+            localStorage.removeItem('harvest_transactions');
+        } catch (e) {
+            console.error("Migration failed", e);
+        }
+    }
 }
 
 function getTodayKey() {
@@ -19,13 +92,8 @@ function getTodayKey() {
     return now.toISOString().split('T')[0]; // "2026-03-25"
 }
 
-function getTodayTransactions() {
-    const todayKey = getTodayKey();
-    return getTransactions().filter(t => t.date === todayKey);
-}
-
 // ---- Add Transaction ----
-function addTransaction(e) {
+async function addTransaction(e) {
     e.preventDefault();
 
     const descEl = document.getElementById('txn-description');
@@ -51,9 +119,7 @@ function addTransaction(e) {
         time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
     };
 
-    const transactions = getTransactions();
-    transactions.unshift(txn); // newest first
-    saveTransactions(transactions);
+    await saveTransaction(txn);
 
     // Reset form
     descEl.value = '';
@@ -62,44 +128,73 @@ function addTransaction(e) {
 
     showToast(`Added: ${description} — Rs ${amount.toLocaleString()}`);
     switchTab('activity');
-    refreshUI();
+    await refreshUI();
 }
 
 // ---- Delete Transaction ----
-function deleteTransaction(id) {
-    let transactions = getTransactions();
-    transactions = transactions.filter(t => t.id !== id);
-    saveTransactions(transactions);
+async function deleteTransaction(id) {
+    await deleteTransactionFromDB(id);
     showToast('Transaction deleted.');
-    refreshUI();
+    await refreshUI();
 }
 
 // ---- Clear All Data ----
-function clearAllData() {
+async function clearAllData() {
     if (confirm('Are you sure you want to clear ALL transactions?')) {
-        localStorage.removeItem(STORAGE_KEY);
+        await clearAllTransactionsDB();
         showToast('All data cleared.');
-        refreshUI();
+        await refreshUI();
     }
 }
 
 // ---- UI Rendering ----
-function refreshUI() {
-    const todayTxns = getTodayTransactions();
-    const totalAmount = todayTxns.reduce((sum, t) => sum + t.amount, 0);
-    const count = todayTxns.length;
+async function refreshUI() {
+    const transactions = await getTransactions();
+    const todayKey = getTodayKey();
+    
+    const todayTxns = transactions.filter(t => t.date === todayKey);
+    const todayAmount = todayTxns.reduce((sum, t) => sum + t.amount, 0);
 
     // Activity Tab Stats
-    document.getElementById('today-volume').textContent = formatCurrency(totalAmount);
-    document.getElementById('today-count').textContent = count;
+    document.getElementById('today-volume').textContent = formatCurrency(todayAmount);
+    document.getElementById('today-count').textContent = todayTxns.length;
 
     // Activity Tab - Recent Transactions (show last 5)
     renderTransactionList('recent-transactions', todayTxns.slice(0, 5), true);
 
-    // Summary Tab
-    document.getElementById('summary-total').textContent = formatCurrency(totalAmount);
-    document.getElementById('summary-count').textContent = `${count} transaction${count !== 1 ? 's' : ''}`;
-    renderTransactionList('summary-transactions', todayTxns, false);
+    // Summary Tab Stats based on filter
+    const filter = document.getElementById('summary-filter')?.value || 'today';
+    let summaryTxns = [];
+    let summaryTitle = "TOTAL EARNINGS TODAY";
+
+    if (filter === 'today') {
+        summaryTxns = todayTxns;
+    } else if (filter === 'week') {
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        const weekAgoKey = weekAgo.toISOString().split('T')[0];
+        summaryTxns = transactions.filter(t => t.date >= weekAgoKey);
+        summaryTitle = "EARNINGS LAST 7 DAYS";
+    } else if (filter === 'month') {
+        const monthAgo = new Date();
+        monthAgo.setDate(monthAgo.getDate() - 30);
+        const monthAgoKey = monthAgo.toISOString().split('T')[0];
+        summaryTxns = transactions.filter(t => t.date >= monthAgoKey);
+        summaryTitle = "EARNINGS LAST 30 DAYS";
+    } else {
+        summaryTxns = transactions;
+        summaryTitle = "ALL TIME EARNINGS";
+    }
+
+    const summaryAmount = summaryTxns.reduce((sum, t) => sum + t.amount, 0);
+    const summaryCount = summaryTxns.length;
+
+    const summaryLabelEl = document.querySelector('.summary-total-label');
+    if (summaryLabelEl) summaryLabelEl.textContent = summaryTitle;
+
+    document.getElementById('summary-total').textContent = formatCurrency(summaryAmount);
+    document.getElementById('summary-count').textContent = `${summaryCount} transaction${summaryCount !== 1 ? 's' : ''}`;
+    renderTransactionList('summary-transactions', summaryTxns, false);
 }
 
 function renderTransactionList(containerId, transactions, showLimit) {
@@ -109,7 +204,7 @@ function renderTransactionList(containerId, transactions, showLimit) {
         container.innerHTML = `
             <div class="empty-state">
                 <i class="ph ph-receipt"></i>
-                <p>No transactions yet today.<br>Tap "New Sale" to get started!</p>
+                <p>No transactions found.</p>
             </div>
         `;
         return;
@@ -126,6 +221,9 @@ function renderTransactionList(containerId, transactions, showLimit) {
 
     let html = transactions.map(t => {
         const icon = categoryIcons[t.category] || 'ph-receipt';
+        // Add date if it's not today (for week/month/all history)
+        const dateStr = t.date !== getTodayKey() ? `<div class="txn-date" style="font-size: 10px; color: var(--primary-light); margin-top: 2px;">${t.date}</div>` : '';
+
         return `
             <div class="txn-item">
                 <div class="txn-icon">
@@ -134,6 +232,7 @@ function renderTransactionList(containerId, transactions, showLimit) {
                 <div class="txn-info">
                     <div class="txn-desc">${escapeHtml(t.description)}</div>
                     <div class="txn-meta">${t.category} • ${t.time}</div>
+                    ${dateStr}
                 </div>
                 <div class="txn-amount">Rs ${t.amount.toLocaleString()}</div>
                 <button class="txn-delete" onclick="deleteTransaction('${t.id}')" aria-label="Delete">
@@ -216,9 +315,10 @@ function setGreeting() {
 }
 
 // ---- Init ----
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     setGreeting();
-    refreshUI();
+    await migrateLocalStorage();
+    await refreshUI();
 });
 
 // ---- Register Service Worker ----

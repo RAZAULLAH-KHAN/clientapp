@@ -1,6 +1,6 @@
 {
-    "name": "Harvest - Transaction Tracker",
-    "short_name": "Harvest",
+    "name": "jazz transaction",
+    "short_name": "jazz",
     "description": "Track your daily sales and calculate end-of-day totals.",
     "start_url": "./index.html",
     "display": "standalone",

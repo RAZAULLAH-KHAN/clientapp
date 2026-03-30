@@ -88,9 +88,17 @@
 
         <!-- ===== TAB: SUMMARY ===== -->
         <main class="tab-content" id="tab-summary">
-            <section class="greeting">
-                <h2 class="greeting-title">Daily Summary</h2>
-                <p class="greeting-sub">End-of-day breakdown</p>
+            <section class="summary-header">
+                <div class="greeting">
+                    <h2 class="greeting-title">Summary</h2>
+                    <p class="greeting-sub">Activity breakdown</p>
+                </div>
+                <select id="summary-filter" class="summary-filter" onchange="refreshUI()">
+                    <option value="today">Today</option>
+                    <option value="week">Past 7 Days</option>
+                    <option value="month">Past 30 Days</option>
+                    <option value="all">All Time</option>
+                </select>
             </section>
 
             <section class="summary-total-card">
