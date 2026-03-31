@@ -150,9 +150,11 @@ async function clearAllData() {
 // ---- UI Rendering ----
 async function refreshUI() {
     const transactions = await getTransactions();
-    const todayKey = getTodayKey();
     
-    const todayTxns = transactions.filter(t => t.date === todayKey);
+    // Calculate timestamp for 24 hours ago
+    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+    const todayTxns = transactions.filter(t => parseInt(t.id) >= twentyFourHoursAgo);
+    
     const todayAmount = todayTxns.reduce((sum, t) => sum + t.amount, 0);
 
     // Activity Tab Stats
@@ -170,16 +172,12 @@ async function refreshUI() {
     if (filter === 'today') {
         summaryTxns = todayTxns;
     } else if (filter === 'week') {
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        const weekAgoKey = weekAgo.toISOString().split('T')[0];
-        summaryTxns = transactions.filter(t => t.date >= weekAgoKey);
+        const weekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+        summaryTxns = transactions.filter(t => parseInt(t.id) >= weekAgo);
         summaryTitle = "EARNINGS LAST 7 DAYS";
     } else if (filter === 'month') {
-        const monthAgo = new Date();
-        monthAgo.setDate(monthAgo.getDate() - 30);
-        const monthAgoKey = monthAgo.toISOString().split('T')[0];
-        summaryTxns = transactions.filter(t => t.date >= monthAgoKey);
+        const monthAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+        summaryTxns = transactions.filter(t => parseInt(t.id) >= monthAgo);
         summaryTitle = "EARNINGS LAST 30 DAYS";
     } else {
         summaryTxns = transactions;
@@ -221,8 +219,10 @@ function renderTransactionList(containerId, transactions, showLimit) {
 
     let html = transactions.map(t => {
         const icon = categoryIcons[t.category] || 'ph-receipt';
-        // Add date if it's not today (for week/month/all history)
-        const dateStr = t.date !== getTodayKey() ? `<div class="txn-date" style="font-size: 10px; color: var(--primary-light); margin-top: 2px;">${t.date}</div>` : '';
+        // Add date if it's older than 24 hours (for week/month/all history)
+        const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+        const isOlderThan24h = parseInt(t.id) < twentyFourHoursAgo;
+        const dateStr = isOlderThan24h ? `<div class="txn-date" style="font-size: 10px; color: var(--primary-light); margin-top: 2px;">${t.date}</div>` : '';
 
         return `
             <div class="txn-item">
